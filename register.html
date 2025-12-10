@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Registrarse - Rutas Óptimas{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <h2 class="auth-title">Crear Cuenta</h2>
+        
+        <form method="POST" class="auth-form" id="register-form">
+            <div class="form-group">
+                <label for="username" class="form-label">Usuario</label>
+                <input type="text" id="username" name="username" class="form-input" required value="{{ request.form.username if request.form.username }}">
+            </div>
+            
+            <div class="form-group">
+                <label for="email" class="form-label">Email</label>
+                <input type="email" id="email" name="email" class="form-input" required value="{{ request.form.email if request.form.email }}">
+            </div>
+            
+            <div class="form-group">
+                <label for="full_name" class="form-label">Nombre Completo</label>
+                <input type="text" id="full_name" name="full_name" class="form-input" required value="{{ request.form.full_name if request.form.full_name }}">
+            </div>
+            
+            <div class="form-group">
+                <label for="phone_number" class="form-label">Teléfono</label>
+                <input type="tel" id="phone_number" name="phone_number" class="form-input" required value="{{ request.form.phone_number if request.form.phone_number }}">
+            </div>
+            
+            <div class="form-group">
+                <label for="password" class="form-label">Contraseña</label>
+                <input type="password" id="password" name="password" class="form-input" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="confirm_password" class="form-label">Confirmar Contraseña</label>
+                <input type="password" id="confirm_password" name="confirm_password" class="form-input" required>
+            </div>
+            
+            <!-- reCAPTCHA v2 Visible -->
+            <div class="form-group">
+                <div class="g-recaptcha" data-sitekey="{{ site_key }}"></div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-full">
+                Registrarse
+            </button>
+        </form>
+        
+        <div class="auth-footer">
+            <p>¿Ya tienes cuenta? <a href="{{ url_for('login') }}" class="auth-link">Inicia sesión aquí</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById('register-form').addEventListener('submit', function(e) {
+        const recaptchaResponse = grecaptcha.getResponse();
+        
+        if (!recaptchaResponse) {
+            e.preventDefault();
+            alert('Por favor, completa el reCAPTCHA "No soy robot"');
+            return;
+        }
+        
+        // Validar contraseñas
+        const password = document.getElementById('password').value;
+        const confirmPassword = document.getElementById('confirm_password').value;
+        
+        if (password !== confirmPassword) {
+            e.preventDefault();
+            alert('Las contraseñas no coinciden');
+            return;
+        }
+    });
+</script>
+{% endblock %}

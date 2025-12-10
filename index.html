@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Inicio - Rutas Óptimas{% endblock %}
+
+{% block content %}
+<div class="hero-section">
+    <div class="hero-content">
+        <h1 class="hero-title">Encuentra la Ruta Más Eficiente</h1>
+        <p class="hero-subtitle">Usando algoritmos avanzados de optimización para ahorrar tiempo y combustible</p>
+        <div class="hero-buttons">
+            {% if session.user_id %}
+                <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Ir al Dashboard</a>
+            {% else %}
+                <a href="{{ url_for('register') }}" class="btn btn-primary">Comenzar Ahora</a>
+                <a href="{{ url_for('login') }}" class="btn btn-secondary">Iniciar Sesión</a>
+                <a href="{{ url_for('face_id_login') }}" class="btn btn-outline">Login con Face ID</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="features-section">
+    <div class="container">
+        <h2 class="section-title">Características Principales</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🚗</div>
+                <h3>Rutas Optimizadas</h3>
+                <p>Encuentra el camino más corto usando el algoritmo de colonia de hormigas</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3>Seguridad Avanzada</h3>
+                <p>Autenticación con reconocimiento facial y encriptación de contraseñas</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3>Historial de Viajes</h3>
+                <p>Guarda y revisa todos tus viajes anteriores</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🗺️</div>
+                <h3>Mapas Interactivos</h3>
+                <p>Sistema completo de mapas con rutas en tiempo real para México</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⏱️</div>
+                <h3>Múltiples Transportes</h3>
+                <p>Calcula rutas para conducir, caminar o andar en bicicleta</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📍</div>
+                <h3>Geolocalización</h3>
+                <p>Ubicación automática y geocodificación de direcciones</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

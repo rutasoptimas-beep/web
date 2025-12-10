@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Rutas Óptimas{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- reCAPTCHA v2 -->
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <!-- Script de seguridad -->
+    <script>
+        // Prevenir navegación atrás/adelante
+        history.pushState(null, null, location.href);
+        window.onpopstate = function () {
+            history.go(1);
+        };
+        
+        // Verificar sesión periódicamente
+        setInterval(function() {
+            fetch('/api/user/profile')
+                .then(response => {
+                    if (!response.ok) {
+                        window.location.href = '/login?session=expired';
+                    }
+                })
+                .catch(() => {
+                    // Silenciar errores de conexión
+                });
+        }, 300000); // Cada 5 minutos
+        
+        // Detectar cuando la página pierde foco
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                // Verificar sesión cuando la página vuelve a ser visible
+                fetch('/api/user/profile')
+                    .then(response => {
+                        if (!response.ok) {
+                            window.location.href = '/login?session=expired';
+                        }
+                    });
+            }
+        });
+    </script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="{{ url_for('index') }}" class="nav-logo">RutasÓptimas</a>
+            <div class="nav-menu">
+                {% if session.user_id %}
+                    <!-- USUARIOS LOGUEADOS -->
+                    <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+                    <a href="{{ url_for('maps') }}" class="nav-link">🗺️ Mapas</a>
+                    <a href="{{ url_for('digital_signature') }}" class="nav-link">📄 Firma Digital</a>
+                    <a href="{{ url_for('face_id_setup') }}" class="nav-link">Configurar Face ID</a>
+                    <a href="{{ url_for('trips') }}" class="nav-link">Mis Viajes</a>
+                    <span class="nav-link">
+                        {{ session.username }}
+                        {% if session.face_authenticated %}
+                            <span class="face-id-badge">📷</span>
+                        {% endif %}
+                    </span>
+                    <a href="{{ url_for('logout') }}" class="nav-link">Cerrar Sesión</a>
+                {% else %}
+                    <!-- USUARIOS NO LOGUEADOS -->
+                    <a href="{{ url_for('login') }}" class="nav-link">Iniciar Sesión</a>
+                    <a href="{{ url_for('register') }}" class="nav-link">Registrarse</a>
+                    <a href="{{ url_for('face_id_login') }}" class="nav-link">Login con Face ID</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="flash-message {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <p>&copy; 2024 RutasÓptimas. Sistema integrado de rutas, reconocimiento facial y firma digital.</p>
+        </div>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,1888 @@
+{% extends "base.html" %}
+
+{% block title %}Mapas y Rutas - Rutas Óptimas{% endblock %}
+
+{% block content %}
+<div class="maps-container">
+    <div class="maps-header">
+        <h1>🗺️ Sistema de Rutas Inteligente</h1>
+        <p>Encuentra la mejor ruta por carreteras de México</p>
+    </div>
+
+    <div class="maps-layout">
+        <!-- Panel de control MEJORADO -->
+        <div class="control-panel">
+            <div class="location-inputs">
+                <div class="form-group">
+                    <label class="form-label">📍 Punto de Partida</label>
+                    <div class="input-with-button">
+                        <input type="text" id="startAddress" class="form-input" 
+                               placeholder="Ej: Guadalajara, Monterrey, Cancún, CDMX">
+                        <button type="button" id="useCurrentLocation" class="btn btn-outline" 
+                                style="white-space: nowrap;">
+                            📍 GPS en Vivo
+                        </button>
+                    </div>
+                    <div class="coordinates-display">
+                        <small>Lat: <span id="startLat">-</span>, Lng: <span id="startLng">-</span></small>
+                        <small id="gpsStatus" style="color: #666; display: block; margin-top: 2px;"></small>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">🎯 Destino</label>
+                    <input type="text" id="endAddress" class="form-input" 
+                           placeholder="Ej: Ciudad, colonia, punto de referencia">
+                    <div class="coordinates-display">
+                        <small>Lat: <span id="endLat">-</span>, Lng: <span id="endLng">-</span></small>
+                    </div>
+                </div>
+
+                <!-- Selector de tipo de ruta -->
+                <div class="form-group">
+                    <label class="form-label">🛣️ Tipo de Ruta</label>
+                    <div class="route-type-selector">
+                        <button type="button" id="allRoutes" class="route-type-btn active" data-type="all">
+                            Todas las Rutas
+                        </button>
+                        <button type="button" id="withTolls" class="route-type-btn" data-type="with_tolls">
+                            Con Cuotas
+                        </button>
+                        <button type="button" id="withoutTolls" class="route-type-btn" data-type="without_tolls">
+                            Sin Cuotas
+                        </button>
+                    </div>
+                </div>
+
+                <button id="calculateRoute" class="btn btn-primary btn-full" disabled>
+                    🚀 Calcular Rutas
+                </button>
+
+                <button id="clearRoute" class="btn btn-secondary btn-full" style="display: none;">
+                    🗑️ Limpiar Búsqueda
+                </button>
+            </div>
+
+            <!-- Selector de rutas -->
+            <div id="routeSelector" class="route-selector" style="display: none;">
+                <h3>🔄 Selecciona una Ruta</h3>
+                <div class="routes-tabs">
+                    <button class="tab-btn active" data-tab="all">Todas (3)</button>
+                    <button class="tab-btn" data-tab="fast">Más Rápidas</button>
+                    <button class="tab-btn" data-tab="economic">Más Económicas</button>
+                </div>
+                <div id="routesContainer" class="routes-container"></div>
+            </div>
+
+            <!-- Información de la ruta seleccionada -->
+            <div id="routeDetails" class="route-details" style="display: none;">
+                <div class="route-header-selected">
+                    <h4 id="selectedRouteName">🗺️ Ruta Seleccionada</h4>
+                    <button id="changeRoute" class="btn btn-outline btn-sm">
+                        🔄 Cambiar Ruta
+                    </button>
+                </div>
+                <div id="selectedRouteInfo"></div>
+                <div class="route-comparison">
+                    <h5>📊 Comparativa de Rutas</h5>
+                    <div id="routesComparison" class="comparison-grid"></div>
+                </div>
+                <div id="turnByTurn" class="turn-by-turn"></div>
+            </div>
+        </div>
+
+        <!-- Mapa -->
+        <div class="map-container">
+            <div id="map"></div>
+            <div class="map-controls">
+                <button id="locateMe" class="btn btn-outline">
+                    📍 Mi Ubicación
+                </button>
+                <button id="fitBounds" class="btn btn-outline" style="display: none;">
+                    🗺️ Ajustar Vista
+                </button>
+                <button id="toggleSatellite" class="btn btn-outline">
+                    🛰️ Vista Satélite
+                </button>
+            </div>
+            
+            <!-- Leyenda del mapa -->
+            <div class="map-legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #007bff;"></div>
+                    <span>Ruta Más Rápida</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #28a745;"></div>
+                    <span>Ruta Seleccionada</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #6c757d;"></div>
+                    <span>Otras Rutas</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #ffc107;"></div>
+                    <span>Vista Previa</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading overlay -->
+<div id="loadingOverlay" class="loading-overlay" style="display: none;">
+    <div class="loading-content">
+        <div class="spinner"></div>
+        <p>Calculando rutas por carreteras de México...</p>
+        <div class="loading-details">
+            <span>🗺️ Analizando red vial</span>
+            <span>⏱️ Optimizando tiempos</span>
+            <span>💰 Calculando costos</span>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+    class AdvancedMapsSystem {
+        constructor() {
+            this.map = null;
+            this.startMarker = null;
+            this.endMarker = null;
+            this.routeLayers = {};
+            this.currentRoute = null;
+            this.allRoutes = [];
+            this.filteredRoutes = [];
+            this.currentRouteType = 'all';
+            this.startCoords = null;
+            this.endCoords = null;
+            this.userLocationMarker = null;
+            this.watchId = null;
+            this.isGPSActive = false;
+            this.isSatelliteView = false;
+            
+            // Capas del mapa
+            this.streetsLayer = null;
+            this.satelliteLayer = null;
+            
+            // Elementos DOM
+            this.elements = {
+                startAddress: document.getElementById('startAddress'),
+                endAddress: document.getElementById('endAddress'),
+                startLat: document.getElementById('startLat'),
+                startLng: document.getElementById('startLng'),
+                endLat: document.getElementById('endLat'),
+                endLng: document.getElementById('endLng'),
+                useCurrentLocation: document.getElementById('useCurrentLocation'),
+                calculateRoute: document.getElementById('calculateRoute'),
+                clearRoute: document.getElementById('clearRoute'),
+                routeSelector: document.getElementById('routeSelector'),
+                routesContainer: document.getElementById('routesContainer'),
+                routeDetails: document.getElementById('routeDetails'),
+                selectedRouteInfo: document.getElementById('selectedRouteInfo'),
+                selectedRouteName: document.getElementById('selectedRouteName'),
+                turnByTurn: document.getElementById('turnByTurn'),
+                locateMe: document.getElementById('locateMe'),
+                fitBounds: document.getElementById('fitBounds'),
+                toggleSatellite: document.getElementById('toggleSatellite'),
+                loadingOverlay: document.getElementById('loadingOverlay'),
+                changeRoute: document.getElementById('changeRoute'),
+                routesComparison: document.getElementById('routesComparison'),
+                gpsStatus: document.getElementById('gpsStatus')
+            };
+
+            this.initMap();
+            this.initEvents();
+            this.initializeMexicoMap();
+        }
+
+        initMap() {
+            // Inicializar mapa centrado en México
+            this.map = L.map('map').setView([23.6345, -102.5528], 5);
+
+            // Capa de calles con más detalle
+            this.streetsLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 18,
+                minZoom: 3
+            }).addTo(this.map);
+
+            // Capa satélite
+            this.satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: '© Esri',
+                maxZoom: 18
+            });
+
+            // Capa de carreteras (opcional)
+            this.roadsLayer = L.tileLayer('https://{s}.tile.thunderforest.com/transport/{z}/{x}/{y}.png?apikey=your-api-key', {
+                attribution: '© Thunderforest',
+                maxZoom: 18
+            });
+
+            console.log('🗺️ Mapa de México inicializado con sistema de rutas reales');
+        }
+        
+        toggleSatelliteView() {
+            this.isSatelliteView = !this.isSatelliteView;
+            
+            if (this.isSatelliteView) {
+                this.map.removeLayer(this.streetsLayer);
+                this.satelliteLayer.addTo(this.map);
+                this.elements.toggleSatellite.innerHTML = '🗺️ Vista Normal';
+            } else {
+                this.map.removeLayer(this.satelliteLayer);
+                this.streetsLayer.addTo(this.map);
+                this.elements.toggleSatellite.innerHTML = '🛰️ Vista Satélite';
+            }
+        }
+
+        initEvents() {
+            // Geocodificación automática con sugerencias
+            this.elements.startAddress.addEventListener('input', () => this.suggestAddress('start'));
+            this.elements.endAddress.addEventListener('input', () => this.suggestAddress('end'));
+            
+            this.elements.startAddress.addEventListener('change', () => this.geocodeAddress('start'));
+            this.elements.endAddress.addEventListener('change', () => this.geocodeAddress('end'));
+
+            // Botones principales
+            this.elements.useCurrentLocation.addEventListener('click', () => this.getRealGPSLocation());
+            this.elements.calculateRoute.addEventListener('click', () => this.calculateAllRoutes());
+            this.elements.clearRoute.addEventListener('click', () => this.clearRoute());
+            this.elements.locateMe.addEventListener('click', () => this.locateMe());
+            this.elements.fitBounds.addEventListener('click', () => this.fitToRoute());
+            this.elements.changeRoute.addEventListener('click', () => this.showRouteSelector());
+            this.elements.toggleSatellite.addEventListener('click', () => this.toggleSatelliteView());
+
+            // Selectores de tipo de ruta
+            document.querySelectorAll('.route-type-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.route-type-btn').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    this.currentRouteType = e.target.dataset.type;
+                    if (this.allRoutes.length > 0) {
+                        this.filterRoutes();
+                    }
+                });
+            });
+
+            // Tabs de rutas
+            document.querySelectorAll('.tab-btn').forEach(tab => {
+                tab.addEventListener('click', (e) => {
+                    document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+                    e.target.classList.add('active');
+                    if (this.allRoutes.length > 0) {
+                        this.filterRoutesByTab(e.target.dataset.tab);
+                    }
+                });
+            });
+
+            // Validar inputs
+            this.elements.startAddress.addEventListener('input', () => this.validateInputs());
+            this.elements.endAddress.addEventListener('input', () => this.validateInputs());
+            
+            // Seguridad: Detectar navegación atrás/adelante
+            window.addEventListener('popstate', () => {
+                this.checkSession();
+            });
+            
+            // Detectar cuando la página se vuelve visible
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) {
+                    this.checkSession();
+                }
+            });
+        }
+        
+        async checkSession() {
+            try {
+                const response = await fetch('/api/user/profile');
+                if (!response.ok) {
+                    window.location.href = '/login';
+                }
+            } catch (error) {
+                console.log('Verificando sesión...');
+            }
+        }
+        
+        async suggestAddress(type) {
+            const input = this.elements[`${type}Address`];
+            const value = input.value.trim();
+            
+            if (value.length < 3) return;
+            
+            try {
+                const response = await fetch('/api/simple-geocode', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ address: value })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    // Podrías implementar autocompletado aquí
+                    console.log(`Sugerencia para ${value}: ${data.address}`);
+                }
+            } catch (error) {
+                // Silenciar errores de autocompletado
+            }
+        }
+
+        async geocodeAddress(type) {
+            const address = this.elements[`${type}Address`].value;
+            if (!address.trim()) return;
+
+            try {
+                this.showMessage(`🔍 Buscando: ${address}`, 'info');
+                
+                const response = await fetch('/api/geocode-mexico', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ address: address })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    if (type === 'start') {
+                        this.startCoords = { lat: result.lat, lng: result.lng };
+                        this.elements.startLat.textContent = result.lat.toFixed(4);
+                        this.elements.startLng.textContent = result.lng.toFixed(4);
+                        this.addStartMarker(result.lat, result.lng, result.address);
+                    } else {
+                        this.endCoords = { lat: result.lat, lng: result.lng };
+                        this.elements.endLat.textContent = result.lat.toFixed(4);
+                        this.elements.endLng.textContent = result.lng.toFixed(4);
+                        this.addEndMarker(result.lat, result.lng, result.address);
+                    }
+                    this.validateInputs();
+                    this.showMessage('✅ Ubicación encontrada', 'success');
+                } else {
+                    this.showMessage('❌ ' + result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Error en geocodificación:', error);
+                this.showMessage('❌ Error al buscar la dirección', 'error');
+            }
+        }
+
+        addStartMarker(lat, lng, address) {
+            if (this.startMarker) {
+                this.map.removeLayer(this.startMarker);
+            }
+            
+            const startIcon = L.divIcon({
+                html: '📍',
+                className: 'custom-div-icon',
+                iconSize: [30, 30],
+                iconAnchor: [15, 30]
+            });
+            
+            this.startMarker = L.marker([lat, lng], { icon: startIcon })
+                .addTo(this.map)
+                .bindPopup(`<b>📍 Origen</b><br>${address}`)
+                .openPopup();
+        }
+
+        addEndMarker(lat, lng, address) {
+            if (this.endMarker) {
+                this.map.removeLayer(this.endMarker);
+            }
+            
+            const endIcon = L.divIcon({
+                html: '🎯',
+                className: 'custom-div-icon',
+                iconSize: [30, 30],
+                iconAnchor: [15, 30]
+            });
+            
+            this.endMarker = L.marker([lat, lng], { icon: endIcon })
+                .addTo(this.map)
+                .bindPopup(`<b>🎯 Destino</b><br>${address}`)
+                .openPopup();
+        }
+
+        validateInputs() {
+            const hasStart = this.startCoords !== null;
+            const hasEnd = this.endCoords !== null;
+            this.elements.calculateRoute.disabled = !(hasStart && hasEnd);
+            
+            if (hasStart && hasEnd) {
+                this.elements.calculateRoute.innerHTML = '🚀 Calcular Rutas';
+            }
+        }
+
+        async getRealGPSLocation() {
+            if (!navigator.geolocation) {
+                this.showMessage('Tu navegador no soporta geolocalización', 'error');
+                return;
+            }
+            
+            // Mostrar mensaje de espera
+            this.elements.useCurrentLocation.disabled = true;
+            this.elements.useCurrentLocation.innerHTML = '🔄 Obteniendo...';
+            this.elements.gpsStatus.textContent = 'Obteniendo ubicación GPS...';
+            this.elements.gpsStatus.style.color = '#ffc107';
+            
+            // Configurar timeout más largo
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Tiempo de espera agotado')), 30000);
+            });
+            
+            const geolocationPromise = new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                    enableHighAccuracy: true,
+                    timeout: 25000,
+                    maximumAge: 0
+                });
+            });
+            
+            try {
+                // Usar Promise.race con timeout más largo
+                const position = await Promise.race([geolocationPromise, timeoutPromise]);
+                
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                const accuracy = position.coords.accuracy;
+                
+                // Verificar que las coordenadas estén en México
+                if (!this.isInMexico(lat, lng)) {
+                    throw new Error('Ubicación fuera de México');
+                }
+                
+                this.startCoords = { lat: lat, lng: lng };
+                this.elements.startAddress.value = `Mi ubicación actual`;
+                this.elements.startLat.textContent = lat.toFixed(4);
+                this.elements.startLng.textContent = lng.toFixed(4);
+                
+                this.addStartMarker(lat, lng, 'Tu ubicación actual');
+                this.map.setView([lat, lng], 13);
+                this.validateInputs();
+                
+                // Actualizar estado GPS
+                this.elements.gpsStatus.textContent = `GPS activo (±${Math.round(accuracy)}m)`;
+                this.elements.gpsStatus.style.color = '#28a745';
+                
+                // Obtener dirección
+                await this.reverseGeocode(lat, lng);
+                
+                // Enviar ubicación al servidor
+                await this.sendGPSLocationToServer(lat, lng);
+                
+                this.showMessage('✅ Ubicación GPS obtenida', 'success');
+                
+                // Comenzar a seguir la ubicación
+                this.startTrackingGPS();
+                
+            } catch (error) {
+                console.error('Error GPS:', error);
+                let errorMessage = 'Error al obtener ubicación GPS';
+                
+                if (error.message.includes('Tiempo de espera')) {
+                    errorMessage = 'El GPS está tomando más tiempo de lo esperado. Verifica que tengas señal y permisos habilitados.';
+                } else if (error.code === error.PERMISSION_DENIED) {
+                    errorMessage = 'Permiso de ubicación denegado. Por favor habilita la ubicación en tu navegador.';
+                } else if (error.code === error.POSITION_UNAVAILABLE) {
+                    errorMessage = 'Información de ubicación no disponible. Verifica tu conexión GPS.';
+                } else if (error.code === error.TIMEOUT) {
+                    errorMessage = 'Tiempo de espera agotado. Intenta nuevamente.';
+                } else if (error.message.includes('fuera de México')) {
+                    errorMessage = 'Ubicación fuera de México. El sistema está diseñado para rutas en México.';
+                } else {
+                    errorMessage = `Error: ${error.message}`;
+                }
+                
+                this.showMessage(errorMessage, 'error');
+                this.elements.gpsStatus.textContent = 'GPS no disponible';
+                this.elements.gpsStatus.style.color = '#dc3545';
+                
+                // Ofrecer ubicación aproximada como alternativa
+                this.offerApproximateLocation();
+                
+            } finally {
+                this.elements.useCurrentLocation.disabled = false;
+                this.elements.useCurrentLocation.innerHTML = '📍 GPS en Vivo';
+            }
+        }
+        
+        isInMexico(lat, lng) {
+            // Coordenadas aproximadas de México
+            const mexicoBounds = {
+                north: 32.7186,
+                south: 14.5321,
+                west: -118.4531,
+                east: -86.7031
+            };
+            
+            return lat >= mexicoBounds.south && lat <= mexicoBounds.north &&
+                   lng >= mexicoBounds.west && lng <= mexicoBounds.east;
+        }
+        
+        async reverseGeocode(lat, lng) {
+            try {
+                const response = await fetch('/api/reverse-geocode', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ lat: lat, lng: lng })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    this.elements.startAddress.value = result.address;
+                }
+            } catch (error) {
+                console.log('No se pudo obtener dirección:', error);
+            }
+        }
+        
+        offerApproximateLocation() {
+            if (confirm('¿Deseas usar una ubicación aproximada en México?')) {
+                // Ubicaciones comunes en México
+                const mexicanLocations = [
+                    { name: 'Ciudad de México', lat: 19.4326, lng: -99.1332 },
+                    { name: 'Guadalajara', lat: 20.6597, lng: -103.3496 },
+                    { name: 'Monterrey', lat: 25.6866, lng: -100.3161 },
+                    { name: 'Puebla', lat: 19.0414, lng: -98.2063 },
+                    { name: 'Cancún', lat: 21.1619, lng: -86.8515 }
+                ];
+                
+                const randomLocation = mexicanLocations[Math.floor(Math.random() * mexicanLocations.length)];
+                
+                this.startCoords = { lat: randomLocation.lat, lng: randomLocation.lng };
+                this.elements.startAddress.value = randomLocation.name;
+                this.elements.startLat.textContent = randomLocation.lat.toFixed(4);
+                this.elements.startLng.textContent = randomLocation.lng.toFixed(4);
+                
+                this.addStartMarker(randomLocation.lat, randomLocation.lng, randomLocation.name);
+                this.map.setView([randomLocation.lat, randomLocation.lng], 10);
+                this.validateInputs();
+                
+                this.showMessage(`📍 Usando ubicación aproximada: ${randomLocation.name}`, 'info');
+            }
+        }
+        
+        async sendGPSLocationToServer(lat, lng) {
+            try {
+                await fetch('/api/get-gps-location', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ lat: lat, lng: lng })
+                });
+            } catch (error) {
+                console.log('No se pudo enviar ubicación al servidor:', error);
+            }
+        }
+        
+        startTrackingGPS() {
+            if (this.watchId) {
+                navigator.geolocation.clearWatch(this.watchId);
+            }
+            
+            this.watchId = navigator.geolocation.watchPosition(
+                (position) => {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    const accuracy = position.coords.accuracy;
+                    
+                    // Actualizar marcador de usuario
+                    this.updateUserLocationMarker(lat, lng);
+                    
+                    // Actualizar estado
+                    this.elements.gpsStatus.textContent = `GPS activo (±${Math.round(accuracy)}m)`;
+                    this.elements.gpsStatus.style.color = '#28a745';
+                    
+                    // Si no hay punto de partida establecido, actualizar
+                    if (!this.startCoords) {
+                        this.startCoords = { lat: lat, lng: lng };
+                        this.elements.startAddress.value = `GPS: ${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                        this.elements.startLat.textContent = lat.toFixed(4);
+                        this.elements.startLng.textContent = lng.toFixed(4);
+                        this.validateInputs();
+                    }
+                },
+                (error) => {
+                    console.error('Error en seguimiento GPS:', error);
+                    this.elements.gpsStatus.textContent = 'GPS perdido';
+                    this.elements.gpsStatus.style.color = '#dc3545';
+                },
+                {
+                    enableHighAccuracy: true,
+                    maximumAge: 30000,
+                    timeout: 27000
+                }
+            );
+            
+            this.isGPSActive = true;
+        }
+        
+        updateUserLocationMarker(lat, lng) {
+            if (!this.userLocationMarker) {
+                const userIcon = L.divIcon({
+                    html: '📍',
+                    className: 'user-location-icon',
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 30]
+                });
+                
+                this.userLocationMarker = L.marker([lat, lng], { 
+                    icon: userIcon,
+                    zIndexOffset: 1000
+                })
+                .addTo(this.map)
+                .bindPopup('<b>Tu ubicación actual</b>');
+            } else {
+                this.userLocationMarker.setLatLng([lat, lng]);
+            }
+        }
+
+        locateMe() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        this.map.setView([lat, lng], 13);
+                        this.showMessage('📍 Ubicación obtenida', 'success');
+                    },
+                    (error) => {
+                        console.error('Error GPS:', error);
+                        this.showMessage('No se pudo obtener la ubicación GPS', 'error');
+                    }
+                );
+            } else {
+                this.showMessage('Tu navegador no soporta geolocalización', 'error');
+            }
+        }
+
+        async calculateAllRoutes() {
+            if (!this.startCoords || !this.endCoords) {
+                this.showMessage('Por favor selecciona puntos de partida y destino', 'error');
+                return;
+            }
+
+            this.showLoading('Calculando rutas por carreteras de México...');
+
+            try {
+                const response = await fetch('/api/calculate-route-real', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        start_lat: this.startCoords.lat,
+                        start_lng: this.startCoords.lng,
+                        end_lat: this.endCoords.lat,
+                        end_lng: this.endCoords.lng,
+                        route_type: this.currentRouteType
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    this.allRoutes = data.route_options.all_routes;
+                    this.displayRouteOptions();
+                    this.showRouteOptionsOnMap();
+                    this.showRouteSelector();
+                    this.elements.clearRoute.style.display = 'block';
+                    this.elements.fitBounds.style.display = 'block';
+                    this.showMessage('✅ Rutas calculadas exitosamente', 'success');
+                } else {
+                    this.showMessage('Error: ' + data.error, 'error');
+                }
+            } catch (error) {
+                console.error('Error calculando rutas:', error);
+                this.showMessage('Error al calcular las rutas', 'error');
+            } finally {
+                this.hideLoading();
+            }
+        }
+
+        showRouteOptionsOnMap() {
+            // Limpiar rutas anteriores
+            Object.values(this.routeLayers).forEach(layer => {
+                if (layer) this.map.removeLayer(layer);
+            });
+            this.routeLayers = {};
+
+            // Dibujar cada ruta en el mapa con curvaturas realistas
+            this.allRoutes.forEach((route, index) => {
+                if (route.geometry && route.geometry.coordinates && route.geometry.coordinates.length > 1) {
+                    const color = this.getRouteColor(route, index);
+                    
+                    // Convertir coordenadas para Leaflet [lat, lng]
+                    const routeCoordinates = route.geometry.coordinates.map(coord => {
+                        // Las coordenadas vienen como [lng, lat] en GeoJSON
+                        return [coord[1], coord[0]];
+                    });
+                    
+                    // Crear línea curva más realista
+                    const routeLayer = L.polyline(routeCoordinates, {
+                        color: color,
+                        weight: index === 0 ? 6 : 4,
+                        opacity: 0.8,
+                        lineCap: 'round',
+                        lineJoin: 'round',
+                        dashArray: route.has_tolls ? null : '5, 10',
+                        smoothFactor: 1.0  // Suavizado para rutas curvas
+                    }).addTo(this.map);
+
+                    this.routeLayers[route.id] = routeLayer;
+                    
+                    // Agregar popup informativo
+                    routeLayer.bindPopup(`
+                        <b>${route.name}</b><br>
+                        ⏱️ ${route.duration_formatted}<br>
+                        📏 ${route.distance_km} km<br>
+                        💰 $${route.fuel_estimate.cost_mxn}<br>
+                        ${route.has_tolls ? '💰 Con cuota' : '🆓 Libre'}
+                    `);
+                    
+                    // Agregar eventos hover
+                    routeLayer.on('mouseover', () => {
+                        routeLayer.setStyle({ weight: 8, opacity: 0.9 });
+                        routeLayer.bringToFront();
+                    });
+                    
+                    routeLayer.on('mouseout', () => {
+                        routeLayer.setStyle({ 
+                            weight: index === 0 ? 6 : 4, 
+                            opacity: 0.8 
+                        });
+                    });
+                    
+                    // Agregar marcadores intermedios para rutas importantes
+                    if (route.waypoints && route.waypoints.length > 0) {
+                        route.waypoints.forEach((waypoint, i) => {
+                            if (i > 0 && i < route.waypoints.length - 1) {  // No el inicio ni el fin
+                                const marker = L.marker([waypoint.location[1], waypoint.location[0]], {
+                                    icon: L.divIcon({
+                                        html: '📍',
+                                        className: 'waypoint-icon',
+                                        iconSize: [20, 20],
+                                        iconAnchor: [10, 20]
+                                    })
+                                })
+                                .addTo(this.map)
+                                .bindPopup(`<b>Punto intermedio</b><br>${waypoint.name || 'Punto en ruta'}`);
+                                
+                                this.routeLayers[`${route.id}_wp${i}`] = marker;
+                            }
+                        });
+                    }
+                } else {
+                    console.warn(`Ruta ${route.id} no tiene geometría válida`);
+                }
+            });
+
+            this.fitToRoute();
+        }
+
+        getRouteColor(route, index) {
+            if (index === 0) return '#007bff'; // Más rápida - azul
+            if (route.has_tolls) return '#dc3545'; // Con cuotas - rojo
+            return '#28a745'; // Sin cuotas - verde
+        }
+
+        displayRouteOptions() {
+            this.elements.routesContainer.innerHTML = '';
+            
+            this.filteredRoutes = this.allRoutes;
+            
+            this.filteredRoutes.forEach((route, index) => {
+                const routeElement = this.createRouteElement(route, index);
+                this.elements.routesContainer.appendChild(routeElement);
+            });
+
+            this.elements.routeSelector.style.display = 'block';
+            
+            // Actualizar contador de tabs
+            document.querySelectorAll('.tab-btn').forEach(tab => {
+                if (tab.dataset.tab === 'all') {
+                    tab.textContent = `Todas (${this.filteredRoutes.length})`;
+                }
+            });
+        }
+
+        createRouteElement(route, index) {
+            const routeElement = document.createElement('div');
+            routeElement.className = `route-option ${index === 0 ? 'recommended' : ''}`;
+            routeElement.innerHTML = `
+                <div class="route-header">
+                    <span class="route-icon">${route.icon}</span>
+                    <div class="route-title">
+                        <h4>${route.name}</h4>
+                        <span class="route-badge ${route.has_tolls ? 'toll-badge' : 'free-badge'}">
+                            ${route.has_tolls ? '💰 Con Cuota' : '🆓 Libre'}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="route-main-stats">
+                    <div class="main-stat">
+                        <span class="stat-value">${route.duration_formatted}</span>
+                        <span class="stat-label">Tiempo</span>
+                    </div>
+                    <div class="main-stat">
+                        <span class="stat-value">${route.distance_km} km</span>
+                        <span class="stat-label">Distancia</span>
+                    </div>
+                    <div class="main-stat">
+                        <span class="stat-value">${route.speed_kmh} km/h</span>
+                        <span class="stat-label">Velocidad</span>
+                    </div>
+                </div>
+
+                <div class="route-details-mini">
+                    <div class="detail-item">
+                        <span class="detail-label">Combustible:</span>
+                        <span class="detail-value">${route.fuel_estimate.liters}L ($${route.fuel_estimate.cost_mxn})</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Tráfico:</span>
+                        <span class="detail-value traffic-${route.traffic_estimate.color}">
+                            ${route.traffic_estimate.level} (${route.traffic_estimate.delay})
+                        </span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Carreteras:</span>
+                        <span class="detail-value">${route.primary_roads}% principales</span>
+                    </div>
+                </div>
+
+                <div class="route-actions">
+                    <button class="btn btn-primary select-route-btn" data-route-id="${route.id}">
+                        Seleccionar Esta Ruta
+                    </button>
+                    <button class="btn btn-outline preview-route-btn" data-route-id="${route.id}">
+                        👁️ Vista Previa
+                    </button>
+                </div>
+            `;
+
+            // Event listeners para los botones
+            routeElement.querySelector('.select-route-btn').addEventListener('click', () => {
+                this.selectRoute(route);
+            });
+
+            routeElement.querySelector('.preview-route-btn').addEventListener('click', () => {
+                this.previewRoute(route);
+            });
+
+            return routeElement;
+        }
+
+        selectRoute(route) {
+            this.currentRoute = route;
+            
+            // Ocultar selector y mostrar detalles
+            this.elements.routeSelector.style.display = 'none';
+            this.elements.routeDetails.style.display = 'block';
+            
+            // Actualizar nombre de ruta seleccionada
+            this.elements.selectedRouteName.textContent = `${route.icon} ${route.name}`;
+            
+            // Mostrar detalles de la ruta
+            this.showRouteDetails(route);
+            
+            // Resaltar ruta en el mapa
+            this.highlightSelectedRoute(route);
+            
+            // Mostrar comparativa
+            this.showRoutesComparison();
+            
+            this.showMessage('✅ Ruta seleccionada: ' + route.name, 'success');
+        }
+
+        previewRoute(route) {
+            // Resaltar temporalmente la ruta en el mapa
+            this.highlightRouteTemporarily(route);
+            this.showMessage('👁️ Vista previa: ' + route.name, 'info');
+        }
+
+        showRouteDetails(route) {
+            this.elements.selectedRouteInfo.innerHTML = `
+                <div class="selected-route-summary">
+                    <div class="summary-grid">
+                        <div class="summary-item">
+                            <div class="summary-icon">⏱️</div>
+                            <div class="summary-content">
+                                <div class="summary-value">${route.duration_formatted}</div>
+                                <div class="summary-label">Tiempo total</div>
+                            </div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-icon">📏</div>
+                            <div class="summary-content">
+                                <div class="summary-value">${route.distance_km} km</div>
+                                <div class="summary-label">Distancia</div>
+                            </div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-icon">💰</div>
+                            <div class="summary-content">
+                                <div class="summary-value">$${route.fuel_estimate.cost_mxn}</div>
+                                <div class="summary-label">Costo combustible</div>
+                            </div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-icon">🚦</div>
+                            <div class="summary-content">
+                                <div class="summary-value traffic-${route.traffic_estimate.color}">${route.traffic_estimate.level}</div>
+                                <div class="summary-label">Tráfico estimado</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="route-description">
+                    <p><strong>Descripción:</strong> ${route.description}</p>
+                    <p><strong>Tipo:</strong> ${route.has_tolls ? 'Con cuotas de autopista' : 'Ruta libre de cuotas'}</p>
+                    <p><strong>Velocidad promedio:</strong> ${route.speed_kmh} km/h</p>
+                    <p><strong>Carreteras principales:</strong> ${route.primary_roads}%</p>
+                </div>
+            `;
+
+            // Mostrar instrucciones paso a paso si están disponibles
+            if (route.steps && route.steps.length > 0) {
+                this.showTurnByTurn(route.steps);
+            } else {
+                this.elements.turnByTurn.innerHTML = '<p>Instrucciones detalladas no disponibles</p>';
+            }
+        }
+
+        showTurnByTurn(steps) {
+            let html = '<h5>🧭 Instrucciones Paso a Paso</h5><div class="steps-list">';
+            
+            steps.forEach((step, index) => {
+                const instruction = step.maneuver ? step.maneuver.instruction : `Paso ${index + 1}`;
+                const distance = step.distance ? (step.distance / 1000).toFixed(1) + ' km' : '';
+                const maneuverType = step.maneuver ? step.maneuver.type : '';
+                let maneuverIcon = '🛣️';
+                
+                // Asignar iconos basados en el tipo de maniobra
+                switch(maneuverType) {
+                    case 'depart': maneuverIcon = '🚀'; break;
+                    case 'arrive': maneuverIcon = '✅'; break;
+                    case 'turn': maneuverIcon = '↪️'; break;
+                    case 'turn right': maneuverIcon = '↪️'; break;
+                    case 'turn left': maneuverIcon = '↩️'; break;
+                    case 'continue': maneuverIcon = '🛣️'; break;
+                    case 'enter highway': maneuverIcon = '🛣️💰'; break;
+                    case 'exit highway': maneuverIcon = '🛣️🚪'; break;
+                }
+                
+                html += `
+                    <div class="step-item">
+                        <div class="step-number">${index + 1}</div>
+                        <div class="step-icon">${maneuverIcon}</div>
+                        <div class="step-content">
+                            <div class="step-instruction">${instruction}</div>
+                            ${distance ? `<div class="step-distance">${distance}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            this.elements.turnByTurn.innerHTML = html;
+        }
+
+        showRoutesComparison() {
+            this.elements.routesComparison.innerHTML = '';
+            
+            // Mostrar las 3 mejores rutas alternativas para comparar
+            const topRoutes = this.allRoutes.slice(0, 3);
+            
+            topRoutes.forEach(route => {
+                const isCurrent = this.currentRoute && this.currentRoute.id === route.id;
+                const comparisonElement = document.createElement('div');
+                comparisonElement.className = `comparison-item ${isCurrent ? 'current' : ''}`;
+                comparisonElement.innerHTML = `
+                    <div class="comparison-header">
+                        <span class="comparison-icon">${route.icon}</span>
+                        <span class="comparison-name">${route.name}</span>
+                        ${isCurrent ? '<span class="current-badge">Actual</span>' : ''}
+                    </div>
+                    <div class="comparison-stats">
+                        <div class="comparison-stat">
+                            <span>${route.duration_formatted}</span>
+                            <small>Tiempo</small>
+                        </div>
+                        <div class="comparison-stat">
+                            <span>${route.distance_km}km</span>
+                            <small>Distancia</small>
+                        </div>
+                        <div class="comparison-stat">
+                            <span>$${route.fuel_estimate.cost_mxn}</span>
+                            <small>Costo</small>
+                        </div>
+                    </div>
+                    ${!isCurrent ? `
+                    <button class="btn btn-outline btn-sm switch-route-btn" data-route-id="${route.id}">
+                        Cambiar a esta
+                    </button>
+                    ` : ''}
+                `;
+                
+                if (!isCurrent) {
+                    comparisonElement.querySelector('.switch-route-btn').addEventListener('click', () => {
+                        this.selectRoute(route);
+                    });
+                }
+                
+                this.elements.routesComparison.appendChild(comparisonElement);
+            });
+        }
+
+        showRouteSelector() {
+            this.elements.routeSelector.style.display = 'block';
+            this.elements.routeDetails.style.display = 'none';
+            this.showMessage('🔄 Selecciona una ruta diferente', 'info');
+        }
+
+        filterRoutes() {
+            if (this.currentRouteType === 'all') {
+                this.filteredRoutes = this.allRoutes;
+            } else if (this.currentRouteType === 'with_tolls') {
+                this.filteredRoutes = this.allRoutes.filter(route => route.has_tolls);
+            } else if (this.currentRouteType === 'without_tolls') {
+                this.filteredRoutes = this.allRoutes.filter(route => !route.has_tolls);
+            }
+            
+            this.displayRouteOptions();
+        }
+
+        filterRoutesByTab(tabType) {
+            let sortedRoutes = [...this.filteredRoutes];
+            
+            switch(tabType) {
+                case 'fast':
+                    sortedRoutes.sort((a, b) => a.duration_min - b.duration_min);
+                    break;
+                case 'economic':
+                    sortedRoutes.sort((a, b) => a.fuel_estimate.cost_mxn - b.fuel_estimate.cost_mxn);
+                    break;
+                default:
+                    // 'all' - mantener orden original
+                    break;
+            }
+            
+            this.displaySortedRoutes(sortedRoutes);
+        }
+
+        displaySortedRoutes(routes) {
+            this.elements.routesContainer.innerHTML = '';
+            routes.forEach((route, index) => {
+                const routeElement = this.createRouteElement(route, index);
+                this.elements.routesContainer.appendChild(routeElement);
+            });
+        }
+
+        highlightSelectedRoute(route) {
+            Object.keys(this.routeLayers).forEach(key => {
+                const layer = this.routeLayers[key];
+                if (layer && layer.setStyle) {
+                    const isSelected = parseInt(key) === route.id;
+                    layer.setStyle({
+                        weight: isSelected ? 8 : 3,
+                        opacity: isSelected ? 0.9 : 0.4,
+                        color: isSelected ? '#28a745' : this.getRouteColor(route, 0)
+                    });
+                }
+            });
+        }
+
+        highlightRouteTemporarily(route) {
+            const layer = this.routeLayers[route.id];
+            if (layer) {
+                const originalStyle = { ...layer.options };
+                layer.setStyle({
+                    weight: 8,
+                    opacity: 0.9,
+                    color: '#ffc107'
+                });
+                
+                setTimeout(() => {
+                    layer.setStyle(originalStyle);
+                }, 3000);
+            }
+        }
+
+        fitToRoute() {
+            if (this.allRoutes.length > 0 && this.startMarker && this.endMarker) {
+                // Crear bounds que incluya todas las rutas
+                const bounds = L.latLngBounds([
+                    this.startMarker.getLatLng(),
+                    this.endMarker.getLatLng()
+                ]);
+                
+                // Agregar puntos de todas las rutas
+                this.allRoutes.forEach(route => {
+                    if (route.geometry && route.geometry.coordinates) {
+                        route.geometry.coordinates.forEach(coord => {
+                            bounds.extend([coord[1], coord[0]]);
+                        });
+                    }
+                });
+                
+                this.map.fitBounds(bounds.pad(0.1));
+            } else if (this.startMarker && this.endMarker) {
+                const bounds = L.latLngBounds([
+                    this.startMarker.getLatLng(),
+                    this.endMarker.getLatLng()
+                ]);
+                this.map.fitBounds(bounds.pad(0.1));
+            }
+        }
+
+        clearRoute() {
+            // Detener seguimiento GPS
+            if (this.watchId) {
+                navigator.geolocation.clearWatch(this.watchId);
+                this.watchId = null;
+            }
+            
+            if (this.userLocationMarker) {
+                this.map.removeLayer(this.userLocationMarker);
+                this.userLocationMarker = null;
+            }
+            
+            // Limpiar marcadores
+            if (this.startMarker) {
+                this.map.removeLayer(this.startMarker);
+                this.startMarker = null;
+            }
+            if (this.endMarker) {
+                this.map.removeLayer(this.endMarker);
+                this.endMarker = null;
+            }
+            
+            // Limpiar rutas
+            Object.values(this.routeLayers).forEach(layer => {
+                if (layer) this.map.removeLayer(layer);
+            });
+            this.routeLayers = {};
+            
+            // Limpiar UI
+            this.elements.startAddress.value = '';
+            this.elements.endAddress.value = '';
+            this.elements.startLat.textContent = '-';
+            this.elements.startLng.textContent = '-';
+            this.elements.endLat.textContent = '-';
+            this.elements.endLng.textContent = '-';
+            this.elements.routeSelector.style.display = 'none';
+            this.elements.routeDetails.style.display = 'none';
+            this.elements.clearRoute.style.display = 'none';
+            this.elements.fitBounds.style.display = 'none';
+            this.elements.gpsStatus.textContent = '';
+            
+            this.startCoords = null;
+            this.endCoords = null;
+            this.allRoutes = [];
+            this.currentRoute = null;
+            this.isGPSActive = false;
+            
+            this.validateInputs();
+            this.showMessage('🗑️ Búsqueda limpiada', 'info');
+        }
+
+        showLoading(message = 'Cargando...') {
+            this.elements.loadingOverlay.style.display = 'flex';
+            if (message) {
+                this.elements.loadingOverlay.querySelector('p').textContent = message;
+            }
+        }
+
+        hideLoading() {
+            this.elements.loadingOverlay.style.display = 'none';
+        }
+
+        showMessage(message, type = 'info') {
+            // Crear mensaje temporal
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flash-message ${type}`;
+            messageDiv.textContent = message;
+            messageDiv.style.cssText = `
+                position: fixed;
+                top: 100px;
+                right: 20px;
+                z-index: 10000;
+                max-width: 300px;
+                animation: slideInRight 0.3s ease;
+            `;
+            
+            document.body.appendChild(messageDiv);
+            
+            // Auto-eliminar después de 5 segundos
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 5000);
+        }
+
+        initializeMexicoMap() {
+            // Centrar en México
+            this.map.setView([23.6345, -102.5528], 5);
+            
+            // Agregar controles
+            L.control.scale().addTo(this.map);
+            
+            // Mostrar mensaje de bienvenida
+            setTimeout(() => {
+                this.showMessage('🗺️ Bienvenido al sistema de rutas reales de México', 'info');
+            }, 1000);
+        }
+        
+        cleanup() {
+            if (this.watchId) {
+                navigator.geolocation.clearWatch(this.watchId);
+            }
+        }
+    }
+
+    // Inicializar cuando el DOM esté listo
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('🗺️ Inicializando sistema de rutas reales de México...');
+        window.mapsSystem = new AdvancedMapsSystem();
+        
+        // Agregar evento para limpiar recursos cuando se cierre la página
+        window.addEventListener('beforeunload', () => {
+            if (window.mapsSystem) {
+                window.mapsSystem.cleanup();
+            }
+        });
+        
+        // Agregar evento para detectar navegación atrás/adelante
+        window.addEventListener('popstate', () => {
+            if (window.mapsSystem) {
+                window.mapsSystem.checkSession();
+            }
+        });
+        
+        // Detectar cuando la página pierde foco
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden && window.mapsSystem) {
+                window.mapsSystem.checkSession();
+            }
+        });
+    });
+</script>
+
+<style>
+    .maps-container {
+        padding: 1rem;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .maps-header {
+        text-align: center;
+        margin-bottom: 2rem;
+        padding: 2rem;
+        background: linear-gradient(135deg, #007bff, #0056b3);
+        color: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .maps-header h1 {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .maps-header p {
+        font-size: 1.2rem;
+        opacity: 0.9;
+    }
+
+    .maps-layout {
+        display: grid;
+        grid-template-columns: 400px 1fr;
+        gap: 2rem;
+        height: calc(100vh - 200px);
+    }
+
+    .control-panel {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        overflow-y: auto;
+        border: 1px solid #e9ecef;
+    }
+
+    .map-container {
+        position: relative;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    #map {
+        height: 100%;
+        width: 100%;
+    }
+
+    .map-controls {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .map-controls .btn {
+        padding: 0.5rem;
+        font-size: 0.8rem;
+        background: white;
+        border: 1px solid #ddd;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+    }
+
+    .map-controls .btn:hover {
+        background: #f8f9fa;
+        transform: translateY(-1px);
+    }
+
+    .map-legend {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        background: white;
+        padding: 1rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        z-index: 1000;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+        font-size: 0.8rem;
+    }
+
+    .legend-color {
+        width: 20px;
+        height: 4px;
+        border-radius: 2px;
+    }
+
+    .input-with-button {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .input-with-button .form-input {
+        flex: 1;
+    }
+
+    .coordinates-display {
+        margin-top: 0.25rem;
+        font-size: 0.8rem;
+        color: #666;
+    }
+
+    /* Estilos mejorados para el sistema de rutas múltiples */
+    .route-type-selector {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .route-type-btn {
+        flex: 1;
+        padding: 0.5rem;
+        border: 2px solid #e9ecef;
+        background: white;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 0.9rem;
+    }
+
+    .route-type-btn.active {
+        border-color: #007bff;
+        background: #007bff;
+        color: white;
+    }
+
+    .route-selector {
+        margin-top: 2rem;
+    }
+
+    .routes-tabs {
+        display: flex;
+        border-bottom: 1px solid #e9ecef;
+        margin-bottom: 1rem;
+    }
+
+    .tab-btn {
+        padding: 0.75rem 1rem;
+        background: none;
+        border: none;
+        border-bottom: 3px solid transparent;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        flex: 1;
+        text-align: center;
+    }
+
+    .tab-btn.active {
+        border-bottom-color: #007bff;
+        color: #007bff;
+        font-weight: 600;
+    }
+
+    .routes-container {
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+
+    .route-option {
+        background: white;
+        border: 1px solid #e9ecef;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        transition: all 0.3s ease;
+        position: relative;
+    }
+
+    .route-option.recommended {
+        border: 2px solid #007bff;
+        background: #f8f9ff;
+    }
+
+    .route-option.recommended::before {
+        content: '⭐ Recomendada';
+        position: absolute;
+        top: -10px;
+        right: 10px;
+        background: #007bff;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 0.7rem;
+        font-weight: bold;
+    }
+
+    .route-option:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+
+    .route-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .route-icon {
+        font-size: 2rem;
+    }
+
+    .route-title {
+        flex: 1;
+    }
+
+    .route-badge {
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.7rem;
+        font-weight: bold;
+    }
+
+    .toll-badge {
+        background: #ffe6e6;
+        color: #dc3545;
+        border: 1px solid #dc3545;
+    }
+
+    .free-badge {
+        background: #e6f7e6;
+        color: #28a745;
+        border: 1px solid #28a745;
+    }
+
+    .route-main-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+        margin-bottom: 1rem;
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    .main-stat {
+        text-align: center;
+    }
+
+    .stat-value {
+        display: block;
+        font-size: 1.25rem;
+        font-weight: bold;
+        color: #007bff;
+    }
+
+    .stat-label {
+        display: block;
+        font-size: 0.8rem;
+        color: #666;
+        margin-top: 0.25rem;
+    }
+
+    .route-details-mini {
+        margin-bottom: 1rem;
+    }
+
+    .detail-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.25rem 0;
+        font-size: 0.9rem;
+    }
+
+    .detail-label {
+        color: #666;
+    }
+
+    .detail-value {
+        font-weight: 500;
+    }
+
+    .traffic-green { color: #28a745; }
+    .traffic-orange { color: #fd7e14; }
+    .traffic-red { color: #dc3545; }
+
+    .route-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .route-actions .btn {
+        flex: 1;
+    }
+
+    /* Estilos para la vista de detalles */
+    .route-header-selected {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .summary-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    .summary-icon {
+        font-size: 1.5rem;
+    }
+
+    .summary-value {
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: #007bff;
+    }
+
+    .summary-label {
+        font-size: 0.8rem;
+        color: #666;
+    }
+
+    .route-description {
+        background: #e7f3ff;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+        border-left: 4px solid #007bff;
+    }
+
+    /* Comparativa de rutas */
+    .comparison-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .comparison-item {
+        background: white;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .comparison-item.current {
+        border-color: #28a745;
+        background: #f8fff8;
+    }
+
+    .comparison-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .comparison-icon {
+        font-size: 1.2rem;
+    }
+
+    .comparison-name {
+        font-weight: 500;
+        flex: 1;
+    }
+
+    .current-badge {
+        background: #28a745;
+        color: white;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 0.7rem;
+        font-weight: bold;
+    }
+
+    .comparison-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .comparison-stat {
+        text-align: center;
+    }
+
+    .comparison-stat span {
+        display: block;
+        font-weight: bold;
+        color: #333;
+    }
+
+    .comparison-stat small {
+        color: #666;
+        font-size: 0.7rem;
+    }
+
+    /* Instrucciones paso a paso */
+    .steps-list {
+        margin-top: 1rem;
+    }
+
+    .step-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 0.75rem;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .step-item:last-child {
+        border-bottom: none;
+    }
+
+    .step-number {
+        background: #007bff;
+        color: white;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+        font-weight: bold;
+        flex-shrink: 0;
+    }
+
+    .step-content {
+        flex: 1;
+    }
+
+    .step-instruction {
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+    }
+
+    .step-distance {
+        font-size: 0.8rem;
+        color: #666;
+    }
+
+    /* Loading overlay */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    }
+
+    .loading-content {
+        background: white;
+        padding: 2rem;
+        border-radius: 12px;
+        text-align: center;
+        max-width: 400px;
+        width: 90%;
+    }
+
+    .spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #007bff;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1rem;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .loading-details {
+        margin-top: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .loading-details span {
+        font-size: 0.9rem;
+        color: #666;
+    }
+
+    @keyframes slideInRight {
+        from {
+            opacity: 0;
+            transform: translateX(100%);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
+    /* Estilos para marcador de ubicación del usuario */
+    .user-location-icon {
+        animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.2); }
+        100% { transform: scale(1); }
+    }
+    
+    /* Mejoras de responsive */
+    @media (max-width: 768px) {
+        .maps-layout {
+            grid-template-columns: 1fr;
+            height: auto;
+        }
+        
+        .control-panel {
+            order: 2;
+        }
+        
+        .map-container {
+            order: 1;
+            height: 400px;
+        }
+        
+        .route-main-stats {
+            grid-template-columns: 1fr;
+        }
+        
+        .summary-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .route-actions {
+            flex-direction: column;
+        }
+        
+        .route-type-selector {
+            flex-direction: column;
+        }
+        
+        .map-controls {
+            flex-direction: row;
+            top: auto;
+            bottom: 10px;
+            right: 10px;
+        }
+        
+        .input-with-button {
+            flex-direction: column;
+        }
+        
+        .maps-header h1 {
+            font-size: 2rem;
+        }
+        
+        .maps-header {
+            padding: 1.5rem 1rem;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .maps-container {
+            padding: 0.5rem;
+        }
+        
+        .control-panel {
+            padding: 1rem;
+        }
+        
+        .route-option {
+            padding: 1rem;
+        }
+        
+        .map-legend {
+            font-size: 0.7rem;
+            padding: 0.5rem;
+        }
+    }
+</style>
+{% endblock %}
